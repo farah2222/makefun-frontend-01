@@ -15,7 +15,7 @@
 
 import { cached, getBounties, getBounty, getLeaderboard, getProfile, lastFetched } from './api.js';
 import { boardList, boardView, errorView } from './views.js';
-import { norm, timeLeft } from './format.js';
+import { esc, norm, timeLeft } from './format.js';
 
 const app = document.getElementById('app');
 const BOARD_PATH = '/competitions?status=open&activity=times';
@@ -134,6 +134,73 @@ function wireSort() {
   });
 }
 
+/** Prefetch: hovering a bounty link, or landing keyboard focus on it,
+    fetches that bounty in the background, so the click that follows renders
+    from the cache instead of waiting on the network. A failed prefetch is
+    not an error — the click still fetches for real, and the slug is forgotten
+    so a later hover tries again. */
+const prefetchedSlugs = new Set();
+function bountySlugFromLink(link) {
+  const href = link.getAttribute('href') || '';
+  const m = href.match(/^#\/(?:bounty|split)\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function prefetchBounty(slug) {
+  if (!slug || prefetchedSlugs.has(slug)) return;
+  prefetchedSlugs.add(slug);
+  getBounty(slug).catch(() => {
+    prefetchedSlugs.delete(slug);
+  });
+}
+function wirePrefetch() {
+  // One delegated listener each: the board list is re-rendered on every
+  // search, sort and filter, so wiring each link would not survive it.
+  app.addEventListener('mouseover', (event) => {
+    const link = event.target.closest ? event.target.closest('a.title') : null;
+    if (!link) return;
+    prefetchBounty(bountySlugFromLink(link));
+  });
+  app.addEventListener('focusin', (event) => {
+    const link = event.target.closest ? event.target.closest('a.title') : null;
+    if (!link) return;
+    prefetchBounty(bountySlugFromLink(link));
+  });
+}
+
+/** The bounties the reader opened most recently, newest first, kept for
+    this session only: a quick way back to a bounty just looked at. */
+const recentSlugs = [];
+function noteViewed(slug) {
+  if (!slug) return;
+  const at = recentSlugs.indexOf(slug);
+  if (at >= 0) recentSlugs.splice(at, 1);
+  recentSlugs.unshift(slug);
+  if (recentSlugs.length > 5) recentSlugs.length = 5;
+}
+function recentStrip() {
+  if (!boardData || recentSlugs.length < 2) return '';
+  const links = recentSlugs.map((slug) => {
+    const b = boardData.items.find((item) => item.slug === slug);
+    if (!b) return '';
+    return `<a href="#/bounty/${encodeURIComponent(slug)}">${esc(b.title)}</a>`;
+  }).filter(Boolean).join(' · ');
+  if (!links) return '';
+  return `<p class="recent">Recently viewed: ${links}</p>`;
+}
+
+/** Press "/" anywhere to jump to the board's search box, so the reader can
+    filter without reaching for the mouse. It stays out of the way while the
+    reader is already typing in a field. */
+document.addEventListener('keydown', (event) => {
+  if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+  const input = document.getElementById('board-search');
+  if (!input) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  event.preventDefault();
+  input.focus();
+});
+
 /** Show a page: fix avatars, start the countdowns, move focus to the new page, mark the shot ready. */
 function show(html) {
   app.innerHTML = html;
@@ -172,6 +239,8 @@ async function routeBoard() {
     boardData = data;
     document.title = 'make.fun bounties';
     show(boardView(data, stale, lastFetched(BOARD_PATH)));
+    const strip = recentStrip();
+    if (strip) app.insertAdjacentHTML('beforeend', strip);
     wireFilters();
     wireSearch();
     wireSort();
@@ -188,6 +257,7 @@ async function routeBounty(slug) {
     const { bountyView } = await import('./views-extra.js');
     document.title = `${data.title} | make.fun bounties`;
     show(bountyView(data, stale, lastFetched(path)));
+    noteViewed(slug);
   } catch (err) {
     showError(err);
   }
@@ -201,10 +271,12 @@ async function routeSplit(slug) {
       fetchPage(BOARD_PATH, getBounties),
       fetchPage(path, () => getBounty(slug)),
     ]);
-    const { splitView } = await import('./views-extra.js');
+    const { splitView, wireSplitKeys } = await import('./views-extra.js');
     boardData = board.data;
     document.title = `${bounty.data.title} beside the board | make.fun bounties`;
     show(splitView(board.data, bounty.data, board.stale || bounty.stale, lastFetched(path)));
+    wireSplitKeys();
+    noteViewed(slug);
   } catch (err) {
     showError(err);
   }
@@ -267,4 +339,5 @@ async function render() {
 }
 
 window.addEventListener('hashchange', render);
+wirePrefetch();
 render();

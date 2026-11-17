@@ -64,8 +64,10 @@ function leaderRow(e) {
     : '';
   // The top three stand out: the eye lands on the leaders first.
   const top = e.rank != null && e.rank <= 3 ? ' class="top3"' : '';
+  // The rank travels on the row, so keyboard navigation can find and
+  // highlight one row at a time even as the window re-renders.
   return `
-      <tr${top}>
+      <tr${top} data-rank="${e.rank ?? ''}">
         <td>${e.rank ?? '—'}</td>
         <td><a class="entrant" href="#/u/${encodeURIComponent(e.handle || '')}">${avatar}${esc(e.handle || '—')}</a></td>
         <td class="entry-title">${esc(e.title || '—')}</td>
@@ -93,6 +95,13 @@ export function leaderboardView(data, page, stale) {
     <h1>Leaderboard: ${esc(comp.title || '')}</h1>
     <p class="sub">${total} ranked entries · judge win rate · ${esc((data.phase && data.phase.title) || '')}</p>
     ${showing}
+    <form class="lb-jump" id="lb-jump" aria-label="Jump to a rank on the leaderboard">
+      <label for="lb-jump-input">Jump to rank</label>
+      <input type="number" id="lb-jump-input" min="1" max="${total}" placeholder="1–${total}" inputmode="numeric" aria-describedby="lb-jump-hint">
+      <button type="submit">Go</button>
+      <span class="lb-jump-hint" id="lb-jump-hint" role="status"></span>
+    </form>
+    <p class="lb-keys-hint">Keyboard: ↑ ↓ move one rank, PgUp PgDn move a page, Home / End jump to the ends, Enter opens the focused entrant.</p>
     <div class="table-wrap lb-viewport" id="lb-viewport" tabindex="0" role="region" aria-label="Leaderboard entries, scroll to see more">
       <table class="leaderboard lb-virtual">
         <thead><tr><th scope="col">#</th><th scope="col">Entrant</th><th scope="col">Entry</th><th scope="col">Win rate</th><th scope="col">Interval</th><th scope="col">Size</th></tr></thead>
@@ -135,6 +144,7 @@ export function wireLeaderboard(data, page) {
     if (pageLabel) pageLabel.textContent = `Page ${Math.min(p, pages)} of ${pages}`;
     if (prev) prev.disabled = viewport.scrollTop <= 0;
     if (next) next.disabled = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 1;
+    paintFocus();
   }
   function schedule() {
     if (!raf) raf = requestAnimationFrame(render);
@@ -142,6 +152,68 @@ export function wireLeaderboard(data, page) {
   viewport.addEventListener('scroll', schedule, { passive: true });
   if (prev) prev.addEventListener('click', () => { viewport.scrollTop = Math.max(0, viewport.scrollTop - PAGE * LB_ROW_PX); });
   if (next) next.addEventListener('click', () => { viewport.scrollTop = Math.min(viewport.scrollHeight, viewport.scrollTop + PAGE * LB_ROW_PX); });
+
+  // Jump to a rank and keyboard navigation: the reader can type a rank to
+  // land on it, or walk the ranking with the keyboard instead of scrolling.
+  // The focused rank is a 1-based rank; 0 means no row has the focus yet.
+  let focusedRank = 0;
+  const jumpForm = document.getElementById('lb-jump');
+  const jumpInput = document.getElementById('lb-jump-input');
+  const jumpHint = document.getElementById('lb-jump-hint');
+  // The row for a rank, when that rank is inside the window on screen.
+  function rankRow(rank) {
+    return body.querySelector(`tr[data-rank="${rank}"]`);
+  }
+  // Move the focus ring to the focused rank, clearing it from every other row.
+  function paintFocus() {
+    body.querySelectorAll('tr.focused').forEach((row) => row.classList.remove('focused'));
+    if (focusedRank < 1) return;
+    const row = rankRow(focusedRank);
+    if (row) row.classList.add('focused');
+  }
+  // Land the viewport on a rank: clamp it, scroll it to the top of the
+  // window, focus it, and say where the reader landed.
+  function jumpToRank(rank) {
+    const n = Math.min(Math.max(1, Math.floor(Number(rank) || 0)), total);
+    if (!n) {
+      if (jumpHint) jumpHint.textContent = `Type a rank between 1 and ${total}.`;
+      return;
+    }
+    focusedRank = n;
+    viewport.scrollTop = (n - 1) * LB_ROW_PX;
+    if (jumpHint) jumpHint.textContent = `Rank ${n} of ${total}.`;
+    if (jumpInput) jumpInput.value = String(n);
+    render();
+    paintFocus();
+  }
+  // One step from the focused rank, or from the top row on screen when
+  // nothing has the focus yet.
+  function stepFocus(delta) {
+    const start = focusedRank < 1 ? Math.floor(viewport.scrollTop / LB_ROW_PX) + 1 : focusedRank;
+    jumpToRank(start + delta);
+  }
+  // A whole page from the focused rank, in either direction.
+  function pageFocus(delta) {
+    const start = focusedRank < 1 ? Math.floor(viewport.scrollTop / LB_ROW_PX) + 1 : focusedRank;
+    jumpToRank(start + delta * PAGE);
+  }
+  if (jumpForm) jumpForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    jumpToRank(jumpInput ? jumpInput.value : 0);
+  });
+  viewport.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); stepFocus(1); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); stepFocus(-1); }
+    else if (event.key === 'PageDown') { event.preventDefault(); pageFocus(1); }
+    else if (event.key === 'PageUp') { event.preventDefault(); pageFocus(-1); }
+    else if (event.key === 'Home') { event.preventDefault(); jumpToRank(1); }
+    else if (event.key === 'End') { event.preventDefault(); jumpToRank(total); }
+    else if (event.key === 'Enter' && focusedRank >= 1) {
+      const row = rankRow(focusedRank);
+      const link = row ? row.querySelector('a.entrant') : null;
+      if (link) { event.preventDefault(); link.click(); }
+    }
+  });
   render();
 }
 
@@ -221,6 +293,34 @@ export function splitView(board, bounty, stale, updated) {
         ${splitDetail(bounty, false, updated)}
       </div>
     </div>`;
+}
+
+/** Keyboard navigation for the split view's board: Up and Down move between
+    bounties, Enter opens the focused one beside the board. The board links
+    are already focusable, so the reader tabs to one and then walks the list
+    without touching the mouse. Call after the split view is on the page. */
+export function wireSplitKeys() {
+  const list = document.querySelector('.split-board .board');
+  if (!list) return;
+  const links = () => Array.from(list.querySelectorAll('a.title'));
+  list.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    const items = links();
+    if (!items.length) return;
+    const current = document.activeElement;
+    const index = items.indexOf(current);
+    if (event.key === 'Enter') {
+      if (index >= 0) { event.preventDefault(); items[index].click(); }
+      return;
+    }
+    event.preventDefault();
+    // From no focused link, Down starts at the first bounty and Up at the last.
+    const from = index < 0 ? (event.key === 'ArrowDown' ? -1 : 0) : index;
+    const next = event.key === 'ArrowDown'
+      ? Math.min(items.length - 1, from + 1)
+      : Math.max(0, from - 1);
+    items[next].focus();
+  });
 }
 
 /** One entry on a profile: title, bounty, placement, prize, date. */
