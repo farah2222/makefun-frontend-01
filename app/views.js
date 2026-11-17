@@ -22,9 +22,12 @@ export function errorView(err) {
 function boardRow(b, base, selected) {
   const state = openState(b);
   const current = b.slug === selected ? ' aria-current="true"' : '';
+  // A bounty closing within the next day gets a badge, so the eye lands on the urgent ones.
+  const ms = new Date(b.deadline).getTime() - Date.now();
+  const soon = ms > 0 && ms < 86400000;
   return `
       <li class="${state.open ? 'open' : 'closed'}${b.slug === selected ? ' selected' : ''}">
-        <span class="cell-title"><a class="title" href="${base}/${encodeURIComponent(b.slug)}"${current}>${esc(b.title)}</a>${b.category ? `<span class="category">${esc(b.category)}</span>` : ''}</span>
+        <span class="cell-title"><a class="title" href="${base}/${encodeURIComponent(b.slug)}"${current}>${esc(b.title)}</a>${b.category ? `<span class="category">${esc(b.category)}</span>` : ''}${soon ? '<span class="badge-soon">Closing soon</span>' : ''}</span>
         <span class="pot">${pot(b)}</span>
         <span class="fee">${fee(b)}</span>
         <span class="left" data-deadline="${esc(b.deadline)}">${timeLeft(b.deadline)}</span>
@@ -42,8 +45,20 @@ export function boardList(items, base = '#/bounty', selected = '') {
 export function boardView(data, stale, updated) {
   const items = data.items.slice().sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   const open = items.filter((b) => openState(b).open).length;
+  const closing = items.filter((b) => {
+    const ms = new Date(b.deadline).getTime() - Date.now();
+    return ms > 0 && ms < 86400000;
+  }).length;
+  const ended = items.length - open;
   // The pots together, at a glance: each bounty's live pot added up.
   const totalPot = items.reduce((sum, b) => sum + (Number(b.potUsd ?? b.rewardAmount) || 0), 0);
+  // Category pills, in the platform's own order, each with its live count;
+  // a category with no bounties on the board gets no pill.
+  const CATS = ['Code', 'Games', 'Growth', 'Trading'];
+  const catPills = CATS.map((c) => {
+    const n = items.filter((b) => b.category === c).length;
+    return n ? `<button type="button" data-category="${esc(c)}" aria-pressed="false">${esc(c)} <span class="count">${n}</span></button>` : '';
+  }).join('');
   return `${stale ? staleNote() : ''}
     <h1>Open bounties</h1>
     <p class="sub"><span id="board-count">${items.length} bounties</span> · ${open} open for entries · ${money(totalPot)} in live pots${updated ? ` · updated ${clock(updated)} UTC` : ''}</p>
@@ -51,16 +66,31 @@ export function boardView(data, stale, updated) {
       <input type="search" id="board-search" placeholder="Search bounties…" aria-label="Search bounties by title, category or slug" autocomplete="off">
       <label class="sort">Sort
         <select id="board-sort" aria-label="Sort bounties">
-          <option value="deadline" selected>Soonest deadline</option>
+          <option value="deadline" selected>Closing soon</option>
           <option value="pot">Biggest pot</option>
           <option value="entries">Most entries</option>
         </select>
       </label>
     </div>
+    <div class="filter-row">
+      <span class="filter-label" id="status-label">Status</span>
+      <div class="filters status-chips" role="group" aria-labelledby="status-label">
+        <button type="button" data-status="all" aria-pressed="true">All <span class="count">${items.length}</span></button>
+        <button type="button" data-status="live" aria-pressed="false">Live <span class="count">${open}</span></button>
+        <button type="button" data-status="ended" aria-pressed="false">Ended <span class="count">${ended}</span></button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label" id="category-label">Category</span>
+      <div class="filters category-pills" role="group" aria-labelledby="category-label">
+        <button type="button" data-category="all" aria-pressed="true">All <span class="count">${items.length}</span></button>
+        ${catPills}
+      </div>
+    </div>
     <div class="filters" role="group" aria-label="Filter bounties">
-      <button type="button" data-filter="all" aria-pressed="true">All</button>
-      <button type="button" data-filter="open" aria-pressed="false">Open for entries</button>
-      <button type="button" data-filter="closing" aria-pressed="false">Closing soon</button>
+      <button type="button" data-filter="all" aria-pressed="true">All <span class="count">${items.length}</span></button>
+      <button type="button" data-filter="open" aria-pressed="false">Open for entries <span class="count">${open}</span></button>
+      <button type="button" data-filter="closing" aria-pressed="false">Closing soon <span class="count">${closing}</span></button>
     </div>
     <ul class="board">${boardList(items)}</ul>
     <p class="empty" id="board-empty" hidden>No bounties match your search.</p>`;

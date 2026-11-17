@@ -15,7 +15,7 @@
 
 import { cached, getBounties, getBounty, getLeaderboard, getProfile, lastFetched } from './api.js';
 import { boardList, boardView, errorView } from './views.js';
-import { esc, norm, timeLeft } from './format.js';
+import { esc, norm, openState, timeLeft } from './format.js';
 
 const app = document.getElementById('app');
 const BOARD_PATH = '/competitions?status=open&activity=times';
@@ -28,6 +28,8 @@ let leaderboardAt = 0;
 let boardFilter = 'all';
 let boardQuery = '';
 let boardSort = 'deadline';
+let boardStatus = 'all';
+let boardCategory = 'all';
 
 /** Stop the countdown ticker (a route change starts a fresh one). */
 function stopTicker() {
@@ -67,6 +69,19 @@ function filterBoard(items, filter) {
   return items;
 }
 
+/** Which board rows a status keeps: live ones still take entries, ended ones are past their deadline. */
+function filterStatus(items, status) {
+  if (status === 'live') return items.filter((b) => openState(b).open);
+  if (status === 'ended') return items.filter((b) => !openState(b).open);
+  return items;
+}
+
+/** Which board rows a category keeps. */
+function filterCategory(items, category) {
+  if (!category || category === 'all') return items;
+  return items.filter((b) => b.category === category);
+}
+
 /** Which board rows a search keeps: title, category or slug, case-insensitive. */
 function searchBoard(items, query) {
   const q = norm(query);
@@ -82,10 +97,10 @@ function sortBoard(items, sortKey) {
   return rows.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 }
 
-/** The board rows the current search, sort and filter keep. */
+/** The board rows the current search, sort and filters keep. */
 function visibleBoard() {
   if (!boardData) return [];
-  return sortBoard(filterBoard(searchBoard(boardData.items, boardQuery), boardFilter), boardSort);
+  return sortBoard(filterCategory(filterBoard(filterStatus(searchBoard(boardData.items, boardQuery), boardStatus), boardFilter), boardCategory), boardSort);
 }
 
 /** Re-render the board list from the data we hold: search, sort and filter all land here, no new request. */
@@ -130,6 +145,32 @@ function wireSort() {
   if (!select) return;
   select.addEventListener('change', () => {
     boardSort = select.value;
+    refreshBoard();
+  });
+}
+
+/** The board's status chips: all, live or ended, from the data we hold, no new request. */
+function wireStatus() {
+  const group = app.querySelector('.status-chips');
+  if (!group) return;
+  group.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-status]');
+    if (!button || !boardData) return;
+    group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+    boardStatus = button.getAttribute('data-status');
+    refreshBoard();
+  });
+}
+
+/** The board's category pills: one category at a time, from the data we hold, no new request. */
+function wireCategory() {
+  const group = app.querySelector('.category-pills');
+  if (!group) return;
+  group.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-category]');
+    if (!button || !boardData) return;
+    group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+    boardCategory = button.getAttribute('data-category');
     refreshBoard();
   });
 }
@@ -244,6 +285,8 @@ async function routeBoard() {
     wireFilters();
     wireSearch();
     wireSort();
+    wireStatus();
+    wireCategory();
   } catch (err) {
     showError(err);
   }

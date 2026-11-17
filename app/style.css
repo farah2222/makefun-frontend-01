@@ -103,6 +103,96 @@ h3 {
   margin: 0 0 8px;
 }
 
+/* A row of filter chips with a small label, so the board's three filter
+   dimensions (status, category, time) read as separate controls. */
+.filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  color: #555;
+  min-width: 64px;
+}
+
+/* The count on a filter chip: how many bounties sit behind it. */
+.filters .count {
+  font-size: 13px;
+  color: #555;
+}
+
+.filters button[aria-pressed="true"] .count {
+  color: #dbeafe;
+}
+
+/* A bounty closing within the next day gets a badge on its row. */
+.badge-soon {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border: 1px solid #d97706;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Visual polish: a refined header, scannable rows, and a split view that
+   reads as one product — a calm board beside a full bounty panel. */
+.brand::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #0b5cad;
+  margin-right: 8px;
+}
+
+h1 {
+  letter-spacing: -0.01em;
+}
+
+.board li {
+  padding: 12px 0;
+}
+
+.board li:hover {
+  background: #f7fafd;
+}
+
+.board .pot {
+  font-weight: 700;
+  color: #0a6b2e;
+}
+
+/* The bounty panel beside the board is a card: breathing room, a soft
+   edge, and the board column set apart by a divider on wide screens. */
+.split-detail {
+  background: #fbfdff;
+  border: 1px solid #dbe7f3;
+  border-radius: 10px;
+  padding: 4px 20px 20px;
+}
+
+@media (min-width: 901px) {
+  .split-board {
+    border-right: 1px solid #e5e5e5;
+    padding-right: 24px;
+  }
+}
+
+.hero {
+  padding: 20px;
+  gap: 32px;
+}
+
 /* Search and sort sit above the filters: one row, wrapping on a phone. */
 .board-tools {
   display: flex;
@@ -265,8 +355,8 @@ h3 {
   margin: 0;
 }
 
-/* The board list beside a bounty is compact: title, then pot and time
-   left; fee, entries and state stay on the full board. */
+/* The board list beside a bounty is compact: title, then pot, fee, time
+   left and entries; the open/closed state stays on the full board. */
 .board.compact li {
   display: flex;
   flex-wrap: wrap;
@@ -279,14 +369,14 @@ h3 {
   flex: 1 1 100%;
 }
 
-.board.compact .fee,
-.board.compact .entries,
 .board.compact .state {
   display: none;
 }
 
 .board.compact .pot,
-.board.compact .left {
+.board.compact .left,
+.board.compact .fee,
+.board.compact .entries {
   font-size: 14px;
 }
 
