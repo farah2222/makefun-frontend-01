@@ -1,2 +1,4 @@
+# build output and local logs
 out/
 *.log
+.DS_Store

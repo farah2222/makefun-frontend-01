@@ -1,12 +1,12 @@
 // The board and bounty pages: each a function from API data to HTML.
 
-import { date, esc, md, money, openState, timeLeft } from './format.js';
+import { clock, date, esc, md, money, openState, timeLeft } from './format.js';
 
 /** The reward as it stands now: the prize plus any entry fees paid into it. */
-const pot = (b) => money(b.potUsd ?? b.rewardAmount);
+export const pot = (b) => money(b.potUsd ?? b.rewardAmount);
 
 /** The entry fee, when the bounty charges one. */
-const fee = (b) => (b.entryFeeUsd ? `${money(b.entryFeeUsd)} entry fee` : 'Free to enter');
+export const fee = (b) => (b.entryFeeUsd ? `${money(b.entryFeeUsd)} entry fee` : 'Free to enter');
 
 /** A note shown when the page renders from a cached copy because the live API failed. */
 export function staleNote() {
@@ -19,11 +19,12 @@ export function errorView(err) {
 }
 
 /** One board row: title, live pot, entry fee, ticking time left, entries, open state. */
-function boardRow(b) {
+function boardRow(b, base, selected) {
   const state = openState(b);
+  const current = b.slug === selected ? ' aria-current="true"' : '';
   return `
-      <li class="${state.open ? 'open' : 'closed'}">
-        <span class="cell-title"><a class="title" href="#/bounty/${encodeURIComponent(b.slug)}">${esc(b.title)}</a>${b.category ? `<span class="category">${esc(b.category)}</span>` : ''}</span>
+      <li class="${state.open ? 'open' : 'closed'}${b.slug === selected ? ' selected' : ''}">
+        <span class="cell-title"><a class="title" href="${base}/${encodeURIComponent(b.slug)}"${current}>${esc(b.title)}</a>${b.category ? `<span class="category">${esc(b.category)}</span>` : ''}</span>
         <span class="pot">${pot(b)}</span>
         <span class="fee">${fee(b)}</span>
         <span class="left" data-deadline="${esc(b.deadline)}">${timeLeft(b.deadline)}</span>
@@ -33,29 +34,40 @@ function boardRow(b) {
 }
 
 /** The board's rows only, so a filter can update the list without rebuilding the page. */
-export function boardList(items) {
-  return items.map(boardRow).join('');
+export function boardList(items, base = '#/bounty', selected = '') {
+  return items.map((b) => boardRow(b, base, selected)).join('');
 }
 
-/** The board: every open bounty, soonest deadline first, with filters. */
-export function boardView(data, stale) {
+/** The board: every open bounty, with search, sort and filters over the data held. */
+export function boardView(data, stale, updated) {
   const items = data.items.slice().sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   const open = items.filter((b) => openState(b).open).length;
   // The pots together, at a glance: each bounty's live pot added up.
   const totalPot = items.reduce((sum, b) => sum + (Number(b.potUsd ?? b.rewardAmount) || 0), 0);
   return `${stale ? staleNote() : ''}
     <h1>Open bounties</h1>
-    <p class="sub">${items.length} bounties · ${open} open for entries · ${money(totalPot)} in live pots</p>
+    <p class="sub"><span id="board-count">${items.length} bounties</span> · ${open} open for entries · ${money(totalPot)} in live pots${updated ? ` · updated ${clock(updated)} UTC` : ''}</p>
+    <div class="board-tools">
+      <input type="search" id="board-search" placeholder="Search bounties…" aria-label="Search bounties by title, category or slug" autocomplete="off">
+      <label class="sort">Sort
+        <select id="board-sort" aria-label="Sort bounties">
+          <option value="deadline" selected>Soonest deadline</option>
+          <option value="pot">Biggest pot</option>
+          <option value="entries">Most entries</option>
+        </select>
+      </label>
+    </div>
     <div class="filters" role="group" aria-label="Filter bounties">
       <button type="button" data-filter="all" aria-pressed="true">All</button>
       <button type="button" data-filter="open" aria-pressed="false">Open for entries</button>
       <button type="button" data-filter="closing" aria-pressed="false">Closing soon</button>
     </div>
-    <ul class="board">${boardList(items)}</ul>`;
+    <ul class="board">${boardList(items)}</ul>
+    <p class="empty" id="board-empty" hidden>No bounties match your search.</p>`;
 }
 
 /** A bounty's rewards table: live amounts now, falling back to the base table. */
-function rewardsTable(b) {
+export function rewardsTable(b) {
   const rows = (b.rewardsNow && b.rewardsNow.length
     ? b.rewardsNow
     : Object.entries(b.rewards || {}).map(([place, amount]) => ({ place: Number(place), baseUsd: amount, feeShareUsd: null, amountUsd: amount }))
@@ -65,28 +77,4 @@ function rewardsTable(b) {
       <thead><tr><th scope="col">Place</th><th scope="col">Prize</th><th scope="col">Fee share</th><th scope="col">Total now</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
-}
-
-/** One bounty: summary, live facts, rewards table, description and rules. */
-export function bountyView(b, stale) {
-  const state = openState(b);
-  return `${stale ? staleNote() : ''}
-    <p><a href="#/">&larr; All bounties</a></p>
-    <h1>${esc(b.title)}</h1>
-    <p class="summary">${esc(b.summary)}</p>
-    <dl class="facts">
-      <dt>Live pot</dt><dd>${pot(b)}</dd>
-      <dt>Entry fee</dt><dd>${b.entryFeeUsd ? money(b.entryFeeUsd) : 'Free'}</dd>
-      <dt>Deadline</dt><dd>${date(b.deadline)} (<span data-deadline="${esc(b.deadline)}">${timeLeft(b.deadline)}</span>)</dd>
-      <dt>Status</dt><dd>${state.label}</dd>
-      <dt>Entries</dt><dd>${b.submissionCount}</dd>
-      <dt>Category</dt><dd>${esc(b.category || '—')}</dd>
-      ${b.sponsor ? `<dt>Sponsor</dt><dd>${esc(b.sponsor.name)}</dd>` : ''}
-    </dl>
-    <p><a class="button" href="#/bounty/${encodeURIComponent(b.slug)}/leaderboard">Leaderboard &rarr;</a> <a class="button" href="https://make.fun/bounty/${encodeURIComponent(b.slug)}" rel="noopener">Open on make.fun &nearr;</a></p>
-    <h2>Rewards</h2>
-    ${rewardsTable(b)}
-    <h2>About this bounty</h2>
-    <div class="description">${md(b.description)}</div>
-    ${b.rules ? `<h2>Rules</h2><div class="description">${md(b.rules)}</div>` : ''}`;
 }

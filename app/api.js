@@ -35,6 +35,12 @@ export function cached(path) {
   return hit ? hit.data : null;
 }
 
+/** When a path's data was last fetched from the API, or null (for a "data updated at" note). */
+export function lastFetched(path) {
+  const hit = cache.get(API + path);
+  return hit ? new Date(hit.at) : null;
+}
+
 /** The open bounties: { items: [...] } (activity=times leaves out the activity a board does not show). */
 export const getBounties = () => fetchJson('/competitions?status=open&activity=times');
 

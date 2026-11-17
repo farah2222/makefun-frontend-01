@@ -13,9 +13,9 @@
 // window.__shotReady is false while a page loads and true once its data is
 // on screen, so a screenshot script knows when to capture.
 
-import { cached, getBounties, getBounty, getLeaderboard, getProfile } from './api.js';
-import { boardList, boardView, bountyView, errorView } from './views.js';
-import { timeLeft } from './format.js';
+import { cached, getBounties, getBounty, getLeaderboard, getProfile, lastFetched } from './api.js';
+import { boardList, boardView, errorView } from './views.js';
+import { norm, timeLeft } from './format.js';
 
 const app = document.getElementById('app');
 const BOARD_PATH = '/competitions?status=open&activity=times';
@@ -24,6 +24,10 @@ let boardData = null;
 let leaderboardData = null;
 let leaderboardSlug = '';
 let leaderboardAt = 0;
+// The board's controls, all applied to the data we hold: no new request.
+let boardFilter = 'all';
+let boardQuery = '';
+let boardSort = 'deadline';
 
 /** Stop the countdown ticker (a route change starts a fresh one). */
 function stopTicker() {
@@ -63,6 +67,40 @@ function filterBoard(items, filter) {
   return items;
 }
 
+/** Which board rows a search keeps: title, category or slug, case-insensitive. */
+function searchBoard(items, query) {
+  const q = norm(query);
+  if (!q) return items;
+  return items.filter((b) => norm(`${b.title} ${b.category || ''} ${b.slug}`).includes(q));
+}
+
+/** Order the board rows: soonest deadline, biggest pot, or most entries. */
+function sortBoard(items, sortKey) {
+  const rows = items.slice();
+  if (sortKey === 'pot') return rows.sort((a, b) => (Number(b.potUsd ?? b.rewardAmount) || 0) - (Number(a.potUsd ?? a.rewardAmount) || 0));
+  if (sortKey === 'entries') return rows.sort((a, b) => (b.submissionCount || 0) - (a.submissionCount || 0));
+  return rows.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+}
+
+/** The board rows the current search, sort and filter keep. */
+function visibleBoard() {
+  if (!boardData) return [];
+  return sortBoard(filterBoard(searchBoard(boardData.items, boardQuery), boardFilter), boardSort);
+}
+
+/** Re-render the board list from the data we hold: search, sort and filter all land here, no new request. */
+function refreshBoard() {
+  if (!boardData) return;
+  const items = visibleBoard();
+  const list = app.querySelector('.board');
+  if (list) list.innerHTML = boardList(items);
+  const count = document.getElementById('board-count');
+  if (count) count.textContent = boardQuery || boardFilter !== 'all' ? `${items.length} of ${boardData.items.length} bounties` : `${items.length} bounties`;
+  const empty = document.getElementById('board-empty');
+  if (empty) empty.hidden = items.length !== 0;
+  startTicker();
+}
+
 /** The board's filter buttons: filter the list from the data we hold, no new request. */
 function wireFilters() {
   const group = app.querySelector('.filters');
@@ -71,9 +109,28 @@ function wireFilters() {
     const button = event.target.closest('button[data-filter]');
     if (!button || !boardData) return;
     group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
-    const list = app.querySelector('.board');
-    if (list) list.innerHTML = boardList(filterBoard(boardData.items, button.getAttribute('data-filter')));
-    startTicker();
+    boardFilter = button.getAttribute('data-filter');
+    refreshBoard();
+  });
+}
+
+/** The board's search box: narrows the list as you type, from the data we hold. */
+function wireSearch() {
+  const input = document.getElementById('board-search');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    boardQuery = input.value;
+    refreshBoard();
+  });
+}
+
+/** The board's sort control: re-orders the list from the data we hold. */
+function wireSort() {
+  const select = document.getElementById('board-sort');
+  if (!select) return;
+  select.addEventListener('change', () => {
+    boardSort = select.value;
+    refreshBoard();
   });
 }
 
@@ -114,8 +171,10 @@ async function routeBoard() {
     const { data, stale } = await fetchPage(BOARD_PATH, getBounties);
     boardData = data;
     document.title = 'make.fun bounties';
-    show(boardView(data, stale));
+    show(boardView(data, stale, lastFetched(BOARD_PATH)));
     wireFilters();
+    wireSearch();
+    wireSort();
   } catch (err) {
     showError(err);
   }
@@ -124,9 +183,28 @@ async function routeBoard() {
 /** One bounty. */
 async function routeBounty(slug) {
   try {
-    const { data, stale } = await fetchPage(`/competitions/${encodeURIComponent(slug)}`, () => getBounty(slug));
+    const path = `/competitions/${encodeURIComponent(slug)}`;
+    const { data, stale } = await fetchPage(path, () => getBounty(slug));
+    const { bountyView } = await import('./views-extra.js');
     document.title = `${data.title} | make.fun bounties`;
-    show(bountyView(data, stale));
+    show(bountyView(data, stale, lastFetched(path)));
+  } catch (err) {
+    showError(err);
+  }
+}
+
+/** Master-detail: the live board beside one bounty, both from the API. */
+async function routeSplit(slug) {
+  try {
+    const path = `/competitions/${encodeURIComponent(slug)}`;
+    const [board, bounty] = await Promise.all([
+      fetchPage(BOARD_PATH, getBounties),
+      fetchPage(path, () => getBounty(slug)),
+    ]);
+    const { splitView } = await import('./views-extra.js');
+    boardData = board.data;
+    document.title = `${bounty.data.title} beside the board | make.fun bounties`;
+    show(splitView(board.data, bounty.data, board.stale || bounty.stale, lastFetched(path)));
   } catch (err) {
     showError(err);
   }
@@ -147,9 +225,10 @@ async function routeLeaderboard(slug, page) {
       leaderboardData = data;
       leaderboardAt = Date.now();
     }
-    const { leaderboardView } = await import('./views-extra.js');
+    const { leaderboardView, wireLeaderboard } = await import('./views-extra.js');
     document.title = `Leaderboard | ${data.competition ? data.competition.title : slug} | make.fun bounties`;
     show(leaderboardView(data, page, stale));
+    wireLeaderboard(data, page);
   } catch (err) {
     showError(err);
   }
@@ -174,7 +253,9 @@ async function render() {
   app.innerHTML = '<p>Loading…</p>';
   const hash = location.hash || '#/';
   let m;
-  if ((m = hash.match(/^#\/bounty\/([^/]+)\/leaderboard(?:\/(\d+))?$/))) {
+  if ((m = hash.match(/^#\/split\/([^/]+)$/))) {
+    await routeSplit(decodeURIComponent(m[1]));
+  } else if ((m = hash.match(/^#\/bounty\/([^/]+)\/leaderboard(?:\/(\d+))?$/))) {
     await routeLeaderboard(decodeURIComponent(m[1]), Number(m[2] || 1));
   } else if ((m = hash.match(/^#\/bounty\/([^/]+)$/))) {
     await routeBounty(decodeURIComponent(m[1]));

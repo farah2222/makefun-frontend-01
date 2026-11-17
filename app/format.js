@@ -37,6 +37,17 @@ export function openState(b) {
   return { open: false, label: 'Entries closed' };
 }
 
+/** Text folded for search: lowercase, trimmed, runs of space collapsed. */
+export function norm(value) {
+  return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** A time of day as 'HH:MM:SS' in UTC, for a "data updated at" note. */
+export function clock(when) {
+  if (!when) return '—';
+  return new Date(when).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'UTC' });
+}
+
 /** A small markdown subset (headings, bullet lists, bold, links) as HTML. */
 export function md(text) {
   const lines = String(text ?? '').split('\n');

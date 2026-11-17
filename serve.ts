@@ -59,6 +59,14 @@ createServer((request, response) => {
     'cache-control': 'no-store',
   });
   createReadStream(file).pipe(response);
+}).on('error', (err: NodeJS.ErrnoException) => {
+  // A port already in use is the usual failure: say so plainly instead of
+  // crashing with a bare stack trace.
+  if (err.code === 'EADDRINUSE') {
+    console.error(`port ${port} is already in use — try --port <n> for another port`);
+    process.exit(1);
+  }
+  throw err;
 }).listen(port, '127.0.0.1', () => {
   console.log(`app/ is on http://localhost:${port}`);
 });

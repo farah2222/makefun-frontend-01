@@ -17,8 +17,18 @@ node serve.ts        # serves app/ on http://localhost:8080
 | --- | --- | --- |
 | `#/` | Bounty board: live pot, entry fee, time left, entries, open state | `GET /api/competitions?status=open&activity=times` |
 | `#/bounty/<slug>` | Bounty page: summary, live facts, rewards table, description, rules | `GET /api/competitions/{slug}` |
-| `#/bounty/<slug>/leaderboard` | Leaderboard: judge win rate, paginated 20 a page | `GET /api/competitions/{slug}/leaderboard` |
-| `#/u/<handle>` | Public profile: picture, links, record, entries | `GET /api/profiles/{handle}` |
+| `#/split/<slug>` | Board beside bounty: the live board on the left, the selected bounty beside it | `GET /api/competitions?status=open&activity=times` + `GET /api/competitions/{slug}` |
+| `#/bounty/<slug>/leaderboard` | Leaderboard: judge win rate, virtualized scroll window, top three highlighted | `GET /api/competitions/{slug}/leaderboard` |
+| `#/u/<handle>` | Public profile: picture, links, record, best placement, entries | `GET /api/profiles/{handle}` |
+
+## Board: search, sort, filters
+
+The board works on the data it already holds — searching, sorting and
+filtering never make a new request. Type in the search box to narrow rows by
+title, category or slug; sort by soonest deadline, biggest pot or most
+entries; filter by All, Open for entries or Closing soon. The count line
+says how many rows match ("3 of 7 bounties") and an empty state appears
+when nothing matches.
 
 ## Notes
 
@@ -38,10 +48,19 @@ node serve.ts        # serves app/ on http://localhost:8080
   blank page. A hung API gives up after 15 s (`AbortSignal.timeout`) so the
   fallback can happen at all.
 - **Board at a glance.** Each row shows its category under the title, and the
-  board header adds up every live pot.
-- **Leaderboard position.** Each page says which slice it shows
-  ("Showing 1–20 of 404 entries"); a profile shows its win rate from its
-  record.
+  board header adds up every live pot. A search box and a sort control work
+  on the data already held, and the count line says how many rows match.
+- **Bounty headline.** The bounty page opens with a hero strip — live pot,
+  entry fee and ticking time left, too big to miss — and notes when the data
+  was last updated.
+- **Board beside bounty.** `#/split/<slug>` puts the live board on the left
+  and the selected bounty beside it (stacked on a phone, bounty first).
+  Picking a row in the board loads that bounty beside it.
+- **Leaderboard position.** The leaderboard is virtualized: a scroll window
+  renders only the rows on screen, so a 400-entry ranking never puts 400
+  rows in the DOM; each page says which slice it shows
+  ("Showing 1–20 of 404 entries"); the top three rows stand out; a profile
+  shows its win rate from its record and its best placement.
 - **Markdown links.** Bounty descriptions render `###` headings and
   `[text](url)` links, not just bold and bullets.
 - **Access.** Semantic HTML, labelled navigation, focus-visible outlines,

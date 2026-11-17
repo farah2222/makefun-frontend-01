@@ -103,8 +103,216 @@ h3 {
   margin: 0 0 8px;
 }
 
+/* Search and sort sit above the filters: one row, wrapping on a phone. */
+.board-tools {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+
+.board-tools input[type="search"] {
+  flex: 1 1 240px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid #0b5cad;
+  border-radius: 4px;
+  font: inherit;
+  color: #1a1a1a;
+  background: #fff;
+}
+
+.board-tools input[type="search"]:focus-visible {
+  outline: 2px solid #0b5cad;
+  outline-offset: 2px;
+}
+
+.board-tools .sort {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  color: #555;
+}
+
+.board-tools select {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid #0b5cad;
+  border-radius: 4px;
+  font: inherit;
+  color: #0b5cad;
+  background: #fff;
+  cursor: pointer;
+}
+
+.empty {
+  color: #555;
+  font-style: italic;
+}
+
+/* A bounty's headline numbers, too big to miss: live pot, fee, time left. */
+.hero {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid #0b5cad;
+  border-radius: 8px;
+  background: #f2f7fc;
+}
+
+.hero > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-label {
+  font-size: 13px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hero strong {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-pot strong {
+  color: #0a6b2e;
+}
+
+.updated {
+  color: #555;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+/* The leaderboard's top three stand out from the rest of the table. */
+.leaderboard tr.top3 {
+  background: #fff8e1;
+}
+
+.leaderboard tr.top3 td:first-child {
+  color: #8a6d00;
+}
+
+/* A virtual leaderboard: one scrollable viewport, one fixed row height, so
+   only the rows on screen are in the DOM. The header sticks while scrolling. */
+.lb-viewport {
+  max-height: 480px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.lb-virtual {
+  margin: 0;
+}
+
+.lb-virtual thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+  box-shadow: 0 1px 0 #eee;
+}
+
+.lb-virtual tbody td {
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-virtual td.entry-title {
+  max-width: 280px;
+}
+
+.lb-virtual tr.spacer td {
+  height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.lb-virtual tbody tr.spacer {
+  background: transparent;
+}
+
+/* Master-detail: the live board beside the selected bounty. Wide screens
+   put the board on the left and the bounty on the right; a phone stacks
+   them with the bounty first, so the bounty is visible without scrolling
+   past the whole board. */
+.split {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.split-board,
+.split-detail {
+  min-width: 0;
+}
+
+.split-board .board {
+  margin: 0;
+}
+
+/* The board list beside a bounty is compact: title, then pot and time
+   left; fee, entries and state stay on the full board. */
+.board.compact li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 8px 0;
+}
+
+.board.compact .cell-title {
+  flex: 1 1 100%;
+}
+
+.board.compact .fee,
+.board.compact .entries,
+.board.compact .state {
+  display: none;
+}
+
+.board.compact .pot,
+.board.compact .left {
+  font-size: 14px;
+}
+
+.board.compact li.selected {
+  background: #f2f7fc;
+  box-shadow: inset 3px 0 0 #0b5cad;
+  padding-left: 8px;
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .split-detail {
+    grid-row: 1;
+  }
+
+  .split-board {
+    grid-row: 2;
+  }
+}
+
 .filters button,
 .pager a,
+.pager button,
 .button {
   display: inline-block;
   padding: 6px 12px;
@@ -115,6 +323,11 @@ h3 {
   font: inherit;
   cursor: pointer;
   text-decoration: none;
+}
+
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .filters button[aria-pressed="true"] {
