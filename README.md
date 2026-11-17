@@ -1,6 +1,10 @@
 # make.fun frontend
 
-A fully working web client for make.fun, made of static files: no build step,
+[![make.fun · makefun-frontend-01](https://make.fun/badge/makefun-frontend-01.svg)](https://make.fun/bounty/makefun-frontend-01?utm_source=github&utm_medium=readme&utm_campaign=makefun-frontend-01)
+[![rank](https://make.fun/badge/makefun-frontend-01/farah2222/makefun-frontend-01/rank.svg)](https://make.fun/bounty/makefun-frontend-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=makefun-frontend-01)
+[![reward](https://make.fun/badge/makefun-frontend-01/farah2222/makefun-frontend-01/reward.svg)](https://make.fun/bounty/makefun-frontend-01?utm_source=github&utm_medium=readme&utm_campaign=makefun-frontend-01)
+
+An entry in the [make.fun frontend bounty](https://make.fun/bounty/makefun-frontend-01) — a fully working web client for make.fun, made of static files: no build step,
 no framework. It reads make.fun's public API alone and shows the live bounty
 board, a bounty's page, its leaderboard and an account's public profile, each
 reachable by a link and by its own URL.
