@@ -83,6 +83,11 @@ const browser = await chromium.launch();
 const outDir = join(here, 'screenshots');
 mkdirSync(outDir, { recursive: true });
 
+// A shot that is not ready, shows a broken image the app did not hide, logs a
+// console error, or stays over the 256 KiB cap fails the run outright: a
+// screenshot set with a silent problem is worse than no set at all.
+let failed = false;
+
 for (const shot of shots) {
   const page = await browser.newPage({ viewport: shot.viewport, ignoreHTTPSErrors: true });
   const errors = [];
@@ -103,10 +108,11 @@ for (const shot of shots) {
     }
   });
   await page.goto(`http://localhost:${port}/${shot.path}`, { waitUntil: 'domcontentloaded' });
+  let ready = true;
   try {
     await page.waitForFunction(() => window.__shotReady === true, { timeout: 30000 });
   } catch {
-    console.log(`${shot.file}: __shotReady never turned true`);
+    ready = false;
   }
   await page.waitForTimeout(1200);
   const file = join(outDir, shot.file);
@@ -117,11 +123,24 @@ for (const shot of shots) {
     await page.screenshot({ path: file, type: 'jpeg', quality: 70 });
     size = statSync(file).size;
   }
-  const broken = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth === 0).length);
-  console.log(`${shot.file}: ${size} bytes, broken images: ${broken}, console errors: ${errors.length}${errors.length ? ' — ' + errors.slice(0, 3).join(' | ') : ''}`);
+  // Broken images the app already hid (its fixAvatars adds .broken, which is
+  // display:none) never reach the screenshot; only unhandled ones count.
+  const broken = await page.evaluate(() => [...document.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth === 0 && !i.classList.contains('broken')).length);
+  const problems = [];
+  if (!ready) problems.push('__shotReady never turned true');
+  if (broken) problems.push(`${broken} broken image(s)`);
+  if (errors.length) problems.push(`${errors.length} console error(s): ${errors.slice(0, 3).join(' | ')}`);
+  if (size > 262144) problems.push(`${size} bytes, over the 256 KiB cap`);
+  console.log(`${shot.file} (${shot.label ?? shot.path}): ${size} bytes, broken images: ${broken}, console errors: ${errors.length}${problems.length ? ' — FAILED: ' + problems.join('; ') : ''}`);
+  if (problems.length) failed = true;
   await page.close();
 }
 
 await browser.close();
 server.close();
-console.log('done');
+if (failed) {
+  console.log('shots: FAILED — fix the problems above and re-take');
+  process.exitCode = 1;
+} else {
+  console.log('done');
+}

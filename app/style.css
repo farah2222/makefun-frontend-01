@@ -7,6 +7,28 @@ body {
   background: #fff;
 }
 
+/* The skip link stays out of sight until a keyboard user tabs to it. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #fff;
+  padding: 8px 12px;
+  z-index: 1;
+}
+
+.skip:focus {
+  left: 8px;
+  top: 8px;
+  outline: 2px solid #0b5cad;
+}
+
+/* The main landmark receives focus on every route change so screen readers
+   land on the new page — but it must not draw a ring around the whole page. */
+#app:focus {
+  outline: none;
+}
+
 header {
   display: flex;
   gap: 24px;
@@ -52,6 +74,11 @@ h1 {
 h2 {
   font-size: 20px;
   margin: 32px 0 8px;
+}
+
+h3 {
+  font-size: 17px;
+  margin: 24px 0 8px;
 }
 
 .sub {
@@ -120,6 +147,22 @@ h2 {
   font-weight: 600;
 }
 
+.board .cell-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.board .category {
+  font-size: 13px;
+  color: #555;
+}
+
+.showing {
+  color: #555;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
 .board .pot,
 .board .entries {
   font-variant-numeric: tabular-nums;
@@ -170,6 +213,10 @@ td {
 th {
   font-size: 14px;
   color: #555;
+}
+
+tbody tr:nth-child(even) {
+  background: #f7f7f7;
 }
 
 .leaderboard td:first-child {
@@ -247,6 +294,14 @@ th {
 
   h1 {
     font-size: 22px;
+  }
+
+  /* Fingers, not cursors: tappable controls at least 44 px tall. */
+  .filters button,
+  .pager a,
+  .button {
+    min-height: 44px;
+    box-sizing: border-box;
   }
 
   .board li,

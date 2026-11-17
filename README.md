@@ -35,9 +35,19 @@ node serve.ts        # serves app/ on http://localhost:8080
   the first-load Totals line.
 - **Graceful failure.** When the API is unreachable the page renders the last
   cached copy with a note, or a clear error with a retry button — never a
-  blank page.
+  blank page. A hung API gives up after 15 s (`AbortSignal.timeout`) so the
+  fallback can happen at all.
+- **Board at a glance.** Each row shows its category under the title, and the
+  board header adds up every live pot.
+- **Leaderboard position.** Each page says which slice it shows
+  ("Showing 1–20 of 404 entries"); a profile shows its win rate from its
+  record.
+- **Markdown links.** Bounty descriptions render `###` headings and
+  `[text](url)` links, not just bold and bullets.
 - **Access.** Semantic HTML, labelled navigation, focus-visible outlines,
-  `aria-pressed` filter buttons, a phone layout.
+  `aria-pressed` filter buttons, a phone layout, a skip link that appears on
+  keyboard focus, focus moved to the new page on every route change, a
+  `noscript` note, and tappable controls at least 44 px tall on phones.
 
 ## Screenshots
 

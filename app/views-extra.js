@@ -18,6 +18,14 @@ function rate(v) {
   return v != null ? `${(Number(v) / 10000).toFixed(1)}%` : '—';
 }
 
+/** A profile's win rate from its record: wins out of bounties entered. */
+function winRate(rec) {
+  const entered = Number(rec.competitions_entered) || 0;
+  const won = Number(rec.competitions_won) || 0;
+  if (entered <= 0) return '—';
+  return `${Math.round((won / entered) * 100)}% (${won} of ${entered})`;
+}
+
 /** One leaderboard row: rank, entrant, entry, win rate, interval, size. */
 function leaderRow(e) {
   const v = e.values || {};
@@ -45,10 +53,16 @@ export function leaderboardView(data, page, stale) {
   const rows = entries.slice(start, start + PAGE).map(leaderRow).join('');
   const comp = data.competition || {};
   const slug = comp.slug || '';
+  // Which slice of the ranking this page shows, so a reader never wonders
+  // where they are in a 400-entry table.
+  const showing = total === 0
+    ? '<p>No entries ranked yet.</p>'
+    : `<p class="showing">Showing ${start + 1}–${Math.min(start + PAGE, total)} of ${total} entries</p>`;
   return `${stale ? staleNote() : ''}
     <p><a href="#/bounty/${encodeURIComponent(slug)}">&larr; ${esc(comp.title || 'Bounty')}</a></p>
     <h1>Leaderboard: ${esc(comp.title || '')}</h1>
     <p class="sub">${total} ranked entries · judge win rate · ${esc((data.phase && data.phase.title) || '')}</p>
+    ${showing}
     <div class="table-wrap"><table class="leaderboard">
       <thead><tr><th scope="col">#</th><th scope="col">Entrant</th><th scope="col">Entry</th><th scope="col">Win rate</th><th scope="col">Interval</th><th scope="col">Size</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -78,7 +92,7 @@ export function profileView(p, stale) {
   const rec = p.record || {};
   const sols = (p.solutions || []).map(solutionRow).join('');
   const avatar = p.image
-    ? `<img class="avatar-lg" crossorigin="anonymous" src="${esc(p.image)}" alt="" data-avatar>`
+    ? `<img class="avatar-lg" crossorigin="anonymous" src="${esc(absUrl(p.image))}" alt="" data-avatar>`
     : '';
   return `${stale ? staleNote() : ''}
     <p><a href="#/">&larr; All bounties</a></p>
@@ -89,9 +103,9 @@ export function profileView(p, stale) {
         <p class="handle">@${esc(p.handle)}</p>
         ${p.bio ? `<p>${esc(p.bio)}</p>` : ''}
         <p class="links">
-          ${p.github_login ? `<a href="https://github.com/${encodeURIComponent(p.github_login)}">GitHub</a>` : ''}
-          ${p.x ? `<a href="https://x.com/${encodeURIComponent(p.x.username)}">X</a>` : ''}
-          ${p.wallet ? `<a href="${esc(p.wallet.explorer_url)}">Wallet</a>` : ''}
+          ${p.github_login ? `<a href="https://github.com/${encodeURIComponent(p.github_login)}" rel="noopener">GitHub</a>` : ''}
+          ${p.x ? `<a href="https://x.com/${encodeURIComponent(p.x.username)}" rel="noopener">X</a>` : ''}
+          ${p.wallet ? `<a href="${esc(p.wallet.explorer_url)}" rel="noopener">Wallet</a>` : ''}
         </p>
       </div>
     </div>
@@ -100,6 +114,7 @@ export function profileView(p, stale) {
       <dt>Bounties entered</dt><dd>${rec.competitions_entered ?? 0}</dd>
       <dt>Placed</dt><dd>${rec.competitions_placed ?? 0}</dd>
       <dt>Won</dt><dd>${rec.competitions_won ?? 0}</dd>
+      <dt>Win rate</dt><dd>${winRate(rec)}</dd>
       <dt>Prize money</dt><dd>${rec.prize_usd != null ? money(rec.prize_usd) : '$0'}</dd>
     </dl>
     <h2>Entries</h2>

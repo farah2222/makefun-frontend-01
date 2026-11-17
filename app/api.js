@@ -3,6 +3,10 @@
 
 const API = 'https://make.fun/api';
 
+// A hung API must not hang the page: give up after 15 s so the caller can
+// fall back to the copy it already holds, or show its error page.
+const FETCH_TIMEOUT_MS = 15000;
+
 // One in-memory cache entry per URL: the last ETag and the data it returned.
 // The API binds ETags to the minute, so a revalidation inside the same minute
 // answers 304 and costs no fresh download.
@@ -12,9 +16,9 @@ const cache = new Map();
 export async function fetchJson(path) {
   const url = API + path;
   const hit = cache.get(url);
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (hit && hit.etag) headers['If-None-Match'] = hit.etag;
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (res.status === 304 && hit) {
     hit.at = Date.now();
     return hit.data;

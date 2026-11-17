@@ -23,7 +23,7 @@ function boardRow(b) {
   const state = openState(b);
   return `
       <li class="${state.open ? 'open' : 'closed'}">
-        <a class="title" href="#/bounty/${encodeURIComponent(b.slug)}">${esc(b.title)}</a>
+        <span class="cell-title"><a class="title" href="#/bounty/${encodeURIComponent(b.slug)}">${esc(b.title)}</a>${b.category ? `<span class="category">${esc(b.category)}</span>` : ''}</span>
         <span class="pot">${pot(b)}</span>
         <span class="fee">${fee(b)}</span>
         <span class="left" data-deadline="${esc(b.deadline)}">${timeLeft(b.deadline)}</span>
@@ -41,9 +41,11 @@ export function boardList(items) {
 export function boardView(data, stale) {
   const items = data.items.slice().sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   const open = items.filter((b) => openState(b).open).length;
+  // The pots together, at a glance: each bounty's live pot added up.
+  const totalPot = items.reduce((sum, b) => sum + (Number(b.potUsd ?? b.rewardAmount) || 0), 0);
   return `${stale ? staleNote() : ''}
     <h1>Open bounties</h1>
-    <p class="sub">${items.length} bounties · ${open} open for entries · pots update live</p>
+    <p class="sub">${items.length} bounties · ${open} open for entries · ${money(totalPot)} in live pots</p>
     <div class="filters" role="group" aria-label="Filter bounties">
       <button type="button" data-filter="all" aria-pressed="true">All</button>
       <button type="button" data-filter="open" aria-pressed="false">Open for entries</button>
@@ -81,7 +83,7 @@ export function bountyView(b, stale) {
       <dt>Category</dt><dd>${esc(b.category || '—')}</dd>
       ${b.sponsor ? `<dt>Sponsor</dt><dd>${esc(b.sponsor.name)}</dd>` : ''}
     </dl>
-    <p><a class="button" href="#/bounty/${encodeURIComponent(b.slug)}/leaderboard">Leaderboard &rarr;</a> <a class="button" href="https://make.fun/bounty/${encodeURIComponent(b.slug)}">Open on make.fun &nearr;</a></p>
+    <p><a class="button" href="#/bounty/${encodeURIComponent(b.slug)}/leaderboard">Leaderboard &rarr;</a> <a class="button" href="https://make.fun/bounty/${encodeURIComponent(b.slug)}" rel="noopener">Open on make.fun &nearr;</a></p>
     <h2>Rewards</h2>
     ${rewardsTable(b)}
     <h2>About this bounty</h2>

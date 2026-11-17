@@ -33,6 +33,8 @@ function stopTicker() {
 /** Refresh every ticking time-left on screen, without rebuilding the page. */
 function startTicker() {
   stopTicker();
+  // No deadlines on this page, nothing to tick: leave the timer off.
+  if (!app.querySelector('[data-deadline]')) return;
   ticker = setInterval(() => {
     app.querySelectorAll('[data-deadline]').forEach((el) => {
       el.textContent = timeLeft(el.getAttribute('data-deadline'));
@@ -75,12 +77,15 @@ function wireFilters() {
   });
 }
 
-/** Show a page: fix avatars, start the countdowns, mark the shot ready. */
+/** Show a page: fix avatars, start the countdowns, move focus to the new page, mark the shot ready. */
 function show(html) {
   app.innerHTML = html;
   fixAvatars();
   startTicker();
   window.scrollTo(0, 0);
+  // Move keyboard and screen-reader focus to the page that just rendered
+  // (the main element is focusable with tabindex="-1").
+  app.focus({ preventScroll: true });
   window.__shotReady = true;
 }
 

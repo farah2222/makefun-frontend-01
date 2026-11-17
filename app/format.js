@@ -5,9 +5,10 @@ export function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-/** A dollar amount ('1000.00' or 0.5) as '$1,000' or '$0.50'. */
+/** A dollar amount ('1000.00' or 0.5) as '$1,000' or '$0.50'; '—' when there is none. */
 export function money(value) {
   const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(n) ? 0 : 2 });
 }
 
@@ -25,7 +26,8 @@ export function timeLeft(iso) {
   const minutes = Math.floor((ms % 3600000) / 60000);
   if (days > 0) return `${days}d ${hours}h left`;
   if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
+  if (minutes > 0) return `${minutes}m left`;
+  return 'less than a minute left';
 }
 
 /** Whether a bounty still takes entries: by its deadline, not its status alone. */
@@ -35,14 +37,17 @@ export function openState(b) {
   return { open: false, label: 'Entries closed' };
 }
 
-/** A small markdown subset (headings, bullet lists, bold) as HTML. */
+/** A small markdown subset (headings, bullet lists, bold, links) as HTML. */
 export function md(text) {
   const lines = String(text ?? '').split('\n');
   let html = '';
   let inList = false;
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith('## ')) {
+    if (trimmed.startsWith('### ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<h3>${inline(trimmed.slice(4))}</h3>`;
+    } else if (trimmed.startsWith('## ')) {
       if (inList) { html += '</ul>'; inList = false; }
       html += `<h2>${inline(trimmed.slice(3))}</h2>`;
     } else if (trimmed.startsWith('# ')) {
@@ -62,7 +67,9 @@ export function md(text) {
   return html;
 }
 
-/** Inline markdown: bold only, on text already made safe. */
+/** Inline markdown: links, then bold, on text already made safe. */
 function inline(text) {
-  return esc(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return esc(text)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" rel="noopener">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 }
